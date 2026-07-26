@@ -1,0 +1,73 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]  // lets Prisma enable pgvector
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+
+model Notebook {
+  id        String   @id @default(uuid()) @db.Uuid
+  title     String
+  icon      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  sources   Source[]
+  chunks    Chunk[]
+  messages  Message[]
+
+  @@map("notebooks")
+}
+
+model Source {
+  id          String   @id @default(uuid()) @db.Uuid
+  notebookId  String   @map("notebook_id") @db.Uuid
+  type        String
+  title       String
+  status      String   @default("uploading")
+  originUri   String?  @map("origin_uri")
+  metadata    Json?
+  error       String?
+  contentHash String?  @map("content_hash")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  notebook    Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  chunks      Chunk[]
+
+  @@map("sources")
+}
+
+model Chunk {
+  id         String   @id @default(uuid()) @db.Uuid
+  sourceId   String   @map("source_id") @db.Uuid
+  notebookId String   @map("notebook_id") @db.Uuid
+  content    String
+  embedding  Unsupported("vector(1536)")?     // read/written via raw SQL
+  locator    Json
+  chunkIndex Int      @map("chunk_index")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  source     Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  notebook   Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+
+  @@index([notebookId], map: "chunks_notebook_idx")
+  @@map("chunks")
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  notebookId String   @map("notebook_id")
+  role       String   // 'user' | 'assistant'
+  content    String
+  citations  Json?    // ← array of citation objects (add this if missing)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  notebook   Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+
+  @@index([notebookId])
+  @@map("messages")
+}
