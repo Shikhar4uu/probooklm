@@ -1,3 +1,3 @@
-export function extractText(input: { text?: string }) {
+export function extractTextSource(input: { text?: string }) {
   return { text: (input.text ?? '').trim(), pageCount: 1 }
 }

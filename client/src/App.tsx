@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { notebooksApi, type Notebook } from './lib/api'
 import SourcesPanel from './features/sources/sourcespanel'
 import ChatPanel from './features/chat/chatpanel'
+import ThemeToggle from './components/themetoggle'
 import './App.css'
 
 export default function App() {
@@ -41,16 +42,21 @@ export default function App() {
 
   return (
     <div className="app">
+      {/* MOBILE TOP BAR */}
       <header className="topbar">
         <button className="menu-btn" onClick={() => setMenuOpen(o => !o)}>☰</button>
         <span className="brand">📘 ProbookLM</span>
+        <div className="topbar-right"><ThemeToggle /></div>
       </header>
 
       {menuOpen && <div className="overlay" onClick={() => setMenuOpen(false)} />}
 
       {/* LEFT — Notebooks + Sources */}
       <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
-        <div className="brand brand-desktop">📘 ProbookLM</div>
+        <div className="brand-row">
+          <div className="brand brand-desktop">📘 ProbookLM</div>
+          <ThemeToggle />
+        </div>
 
         <button className="create-btn" onClick={() => setCreating(true)}>
           <span className="plus">＋</span> Create new
@@ -84,7 +90,7 @@ export default function App() {
               className={`nb-card ${nb.id === activeId ? 'active' : ''}`}
               onClick={() => { setActiveId(nb.id); setMenuOpen(false) }}
             >
-              <div className="nb-icon">{nb.icon ?? '📓'}</div>
+              <div className="nb-icon">📓</div>
               <div className="nb-meta">
                 <div className="nb-title">{nb.title}</div>
                 <div className="nb-date">
@@ -111,9 +117,9 @@ export default function App() {
       {/* CENTER — Chat */}
       <main className="main">
         {active ? (
-          <div className="chat-wrap">
+          <div className="chat-shell">
             <div className="chat-head">
-              <div className="chat-emoji">{active.icon ?? '📓'}</div>
+              <div className="chat-emoji">📓</div>
               <div>
                 <h1 className="chat-title">{active.title}</h1>
                 <p className="chat-sub">grounded in your sources</p>
@@ -133,6 +139,7 @@ export default function App() {
       {/* RIGHT — Studio / Viewer */}
       <aside className="viewer">
         <h2 className="panel-title">Studio</h2>
+
         <div className="studio-card">
           <div className="studio-emoji">🎧</div>
           <div>
@@ -140,6 +147,7 @@ export default function App() {
             <div className="muted">Coming soon</div>
           </div>
         </div>
+
         <div className="studio-card">
           <div className="studio-emoji">🕸</div>
           <div>
@@ -147,6 +155,7 @@ export default function App() {
             <div className="muted">Coming soon</div>
           </div>
         </div>
+
         <h2 className="panel-title" style={{ marginTop: 20 }}>Source Viewer</h2>
         <p className="muted">Click a citation to open its source here.</p>
       </aside>

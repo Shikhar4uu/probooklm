@@ -1,14 +1,44 @@
-import { extractText } from './text.js'
-import { extractPdf } from './pdf.js'
 import type { SourceType } from '../../../../shared/types.js'
+import { extractTextSource } from './text.js'
+import { extractPdf } from './pdf.js'
+import { extractWebsite } from './website.js'
+import { extractYoutube } from './youtube.js'
+import { extractVtt } from './vtt.js'
 
-export interface ExtractInput { text?: string; buffer?: Buffer; url?: string }
-export interface ExtractResult { text: string; pageCount: number }
+export type ExtractInput = {
+  text?: string
+  buffer?: Buffer
+  url?: string
+}
 
-type Extractor = (input: ExtractInput) => ExtractResult | Promise<ExtractResult>
+export type ExtractResult = {
+  text: string
+  pageCount?: number
+}
 
+export type Extractor = (
+  input: ExtractInput
+) => Promise<ExtractResult> | ExtractResult
+
+/**
+ * Map of source type -> extractor.
+ * pipeline.ts does: const extractor = extractors[source.type as SourceType]
+ */
 export const extractors: Partial<Record<SourceType, Extractor>> = {
-  text: extractText,
+  /* Existing two already accept ExtractInput and return { text, pageCount } */
+  text: extractTextSource,
   pdf: extractPdf,
-  // web, youtube, vtt → Phase 3b
+
+  /* New three return plain strings, so we adapt them here */
+  website: async (input) => ({
+    text: await extractWebsite(input.url ?? ''),
+  }),
+
+  youtube: async (input) => ({
+    text: await extractYoutube(input.url ?? ''),
+  }),
+
+  vtt: (input) => ({
+    text: extractVtt(input.text ?? input.buffer?.toString('utf-8') ?? ''),
+  }),
 }

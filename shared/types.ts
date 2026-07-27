@@ -6,10 +6,11 @@ export type Locator =
   | { type: 'pdf';     page: number; charStart: number; charEnd: number }
   | { type: 'youtube'; startSec: number; endSec: number }
   | { type: 'vtt';     cueStart: number; cueEnd: number; cueIndex: number }
-  | { type: 'web';     anchor?: string; charStart: number; charEnd: number }
+  | { type: 'website';     anchor?: string; charStart: number; charEnd: number }
   | { type: 'text';    charStart: number; charEnd: number }
+  
 
-export type SourceType   = 'pdf' | 'text' | 'web' | 'youtube' | 'vtt'
+export type SourceType   = 'pdf' | 'text' | 'website' | 'youtube' | 'vtt' 
 export type SourceStatus = 'uploading' | 'extracting' | 'indexing' | 'ready' | 'failed'
 
 export interface Notebook {

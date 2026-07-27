@@ -1,65 +1,86 @@
-// server/src/modules/sources/sources.routes.ts
 import { Router } from 'express'
 import multer from 'multer'
-import {
-  listSources,
-  createSourceRow,
-  deleteSource,
-  getSource,
-} from './sources.service.js'
+import { createSourceRow, listSources, deleteSource } from './sources.service.js'
 import { ingestSource } from '../../ingestion/pipeline.js'
 
-export const sourcesRouter = Router()
-
-// Store uploaded files in memory so we can pass the buffer straight to the extractor
-const upload = multer({ storage: multer.memoryStorage() })
-
-// GET /api/notebooks/:notebookId/sources → list a notebook's sources (frontend polls this)
-sourcesRouter.get('/notebooks/:notebookId/sources', async (req, res) => {
-  const notebookId = String(req.params.notebookId ?? '')
-  const sources = await listSources(notebookId)
-  res.json(sources)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
 })
 
-// POST /api/notebooks/:notebookId/sources → add a source (text in body, PDF as multipart 'file')
-sourcesRouter.post(
+const router = Router()
+
+/* List sources in a notebook */
+router.get('/notebooks/:notebookId/sources', async (req, res, next) => {
+  try {
+    const notebookId = String(req.params.notebookId ?? '')
+    res.json(await listSources(notebookId))
+  } catch (err) {
+    next(err)
+  }
+})
+
+/* Add a source: text | pdf | website | youtube | vtt */
+router.post(
   '/notebooks/:notebookId/sources',
   upload.single('file'),
-  async (req, res) => {
-    // Coerce every incoming value to a plain string (params/body can be string | string[])
-    const notebookId = String(req.params.notebookId ?? '')
-    const type = String(req.body.type ?? '')
-    const title = String(req.body.title ?? '')
-    const text = req.body.text != null ? String(req.body.text) : undefined
+  async (req, res, next) => {
+    try {
+      const notebookId = String(req.params.notebookId ?? '')
+      const type = String(req.body.type ?? '')
+      const url = String(req.body.url ?? '')
+      const text = String(req.body.text ?? '')
 
-    if (!type || !title) {
-      return res.status(400).json({ error: 'type and title required' })
+      if (!notebookId) return res.status(400).json({ error: 'Missing notebookId' })
+      if (!type) return res.status(400).json({ error: 'Missing source type' })
+
+      /* Derive a sensible title */
+      let title = String(req.body.title ?? '')
+      if (!title) {
+        if (req.file) title = req.file.originalname
+        else if (url) title = url.replace(/^https?:\/\//, '').slice(0, 80)
+        else title = text.slice(0, 60) || 'Untitled source'
+      }
+
+      /* Validate required input per type */
+      if ((type === 'website' || type === 'youtube') && !url) {
+        return res.status(400).json({ error: `A URL is required for ${type} sources` })
+      }
+      if (type === 'pdf' && !req.file) {
+        return res.status(400).json({ error: 'A PDF file is required' })
+      }
+      if (type === 'text' && !text) {
+        return res.status(400).json({ error: 'Text content is required' })
+      }
+      if (type === 'vtt' && !req.file && !text) {
+        return res.status(400).json({ error: 'A .vtt file is required' })
+      }
+
+      const source = await createSourceRow({ notebookId, type, title })
+
+      /* Fire and forget — the client polls for status */
+      void ingestSource(source.id, {
+        text: text || undefined,
+        url: url || undefined,
+        buffer: req.file?.buffer,
+      })
+
+      res.status(201).json(source)
+    } catch (err) {
+      next(err)
     }
-
-    const source = await createSourceRow({ notebookId, type, title })
-
-    // fire-and-forget: run ingestion in the background, return immediately
-    ingestSource(source.id, { text, buffer: req.file?.buffer }).catch(console.error)
-
-    res.status(201).json(source)
-  },
+  }
 )
 
-// DELETE /api/sources/:id → remove a source (its chunks cascade-delete)
-sourcesRouter.delete('/sources/:id', async (req, res) => {
-  const id = String(req.params.id ?? '')
-  await deleteSource(id)
-  res.status(204).end()
+/* Delete a source (chunks cascade) */
+router.delete('/sources/:id', async (req, res, next) => {
+  try {
+    await deleteSource(String(req.params.id ?? ''))
+    res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
 })
 
-// POST /api/sources/:id/reindex → re-run ingestion for a source
-sourcesRouter.post('/sources/:id/reindex', async (req, res) => {
-  const id = String(req.params.id ?? '')
-  const source = await getSource(id)
-  if (!source) return res.status(404).json({ error: 'not found' })
-
-  // Note: reindex works for text/web/youtube/vtt; PDFs need re-upload (buffer isn't stored)
-  ingestSource(source.id, {}).catch(console.error)
-
-  res.json(source)
-})
+export const sourcesRouter = router
+export default router
