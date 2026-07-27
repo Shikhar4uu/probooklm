@@ -36,10 +36,10 @@ export default function ChatPanel({ notebookId }: { notebookId: string }) {
     try {
       const assistant = await chatApi.ask(notebookId, q)
       setMessages(prev => [...prev, assistant])
-    } catch {
+    } catch(err) {
       setMessages(prev => [...prev, {
         id: 'err-' + Date.now(), notebookId, role: 'assistant',
-        content: '⚠️ Something went wrong. Please try again.',
+        content: '⚠️ Something went wrong. Please try again.' + String(err),
         createdAt: new Date().toISOString(),
       }])
     } finally {

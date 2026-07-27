@@ -59,11 +59,11 @@ model Chunk {
 }
 
 model Message {
-  id         String   @id @default(uuid())
-  notebookId String   @map("notebook_id")
-  role       String   // 'user' | 'assistant'
+  id         String   @id @default(uuid()) @db.Uuid          
+  notebookId String   @map("notebook_id") @db.Uuid           
+  role       String
   content    String
-  citations  Json?    // ← array of citation objects (add this if missing)
+  citations  Json?
   createdAt  DateTime @default(now()) @map("created_at")
 
   notebook   Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)

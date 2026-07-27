@@ -93,10 +93,16 @@ export const chatApi = {
   history: (notebookId: string): Promise<Message[]> =>
     fetch(`${API}/api/notebooks/${notebookId}/messages`).then(r => r.json()),
 
-  ask: (notebookId: string, question: string): Promise<Message> =>
-    fetch(`${API}/api/notebooks/${notebookId}/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question }),
-    }).then(r => r.json()),
+ ask: async (notebookId: string, question: string): Promise<Message> => {
+  const r = await fetch(`${API}/api/notebooks/${notebookId}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question }),
+  })
+  const data = await r.json()
+  if (!r.ok || !data?.content) {
+    throw new Error(data?.error ?? `Request failed (${r.status})`)
+  }
+  return data as Message
+},
 }

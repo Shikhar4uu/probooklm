@@ -1,11 +1,11 @@
-import { prisma } from '../infra/db.js'
-import { query } from '../infra/db.js'
+// server/src/ingestion/pipeline.ts
+import { randomUUID } from 'node:crypto'
+import { prisma, query } from '../infra/db.js'
 import { extractors, type ExtractInput } from './extractors/registry.js'
 import { chunkText } from './chunker.js'
 import { embed } from './embeddings.js'
 import type { SourceType } from '../../../shared/types.js'
 
-// Runs in the background — NOT awaited by the route, so the UI returns instantly.
 export async function ingestSource(sourceId: string, input: ExtractInput) {
   try {
     const source = await prisma.source.update({
@@ -30,13 +30,14 @@ export async function ingestSource(sourceId: string, input: ExtractInput) {
     for (let i = 0; i < chunks.length; i++) {
       const c = chunks[i]
       await query(
-        `INSERT INTO chunks (source_id, notebook_id, content, embedding, locator, chunk_index)
-         VALUES ($1, $2, $3, $4::vector, $5::jsonb, $6)`,
+        `INSERT INTO chunks (id, source_id, notebook_id, content, embedding, locator, chunk_index)
+         VALUES ($1, $2, $3, $4, $5::vector, $6::jsonb, $7)`,
         [
+          randomUUID(),                    // ← THE FIX: generate the id ourselves
           sourceId,
           source.notebookId,
           c.content,
-          `[${vectors[i].join(',')}]`,      // pgvector text format
+          `[${vectors[i].join(',')}]`,
           JSON.stringify(c.locator),
           c.index,
         ],
@@ -44,8 +45,12 @@ export async function ingestSource(sourceId: string, input: ExtractInput) {
     }
 
     // 5) READY
-    await prisma.source.update({ where: { id: sourceId }, data: { status: 'ready', error: null } })
+    await prisma.source.update({
+      where: { id: sourceId },
+      data: { status: 'ready', error: null },
+    })
   } catch (err) {
+    console.error('INGEST FAILED:', err)
     await prisma.source.update({
       where: { id: sourceId },
       data: { status: 'failed', error: String(err) },
